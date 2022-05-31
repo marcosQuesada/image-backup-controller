@@ -24,6 +24,9 @@ const (
 	PhasePending = "PENDING"
 	PhaseRunning = "RUNNING"
 	PhaseDone    = "DONE"
+
+	DeploymentResourceType = "deployment"
+	DaemonSetResourceType  = "daemonset"
 )
 
 // ImageBackupSpec defines the desired state of ImageBackup
@@ -35,7 +38,9 @@ type ImageBackupSpec struct {
 
 // ImageBackupStatus defines the observed state of ImageBackup
 type ImageBackupStatus struct {
-	Phase string `json:"phase,omitempty"`
+	Phase             string           `json:"phase,omitempty"`
+	CreateAt          *metav1.Time     `json:"create_at,omitempty"`
+	ExecutionDuration *metav1.Duration `json:"duration,omitempty"`
 }
 
 //+kubebuilder:object:root=true
