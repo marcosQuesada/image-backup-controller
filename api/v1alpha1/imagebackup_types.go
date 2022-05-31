@@ -17,6 +17,7 @@ limitations under the License.
 package v1alpha1
 
 import (
+	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -39,7 +40,7 @@ type ImageBackupSpec struct {
 // ImageBackupStatus defines the observed state of ImageBackup
 type ImageBackupStatus struct {
 	Phase             string           `json:"phase,omitempty"`
-	CreateAt          *metav1.Time     `json:"create_at,omitempty"`
+	CreateAt          *metav1.Time     `json:"create_at,omitempty"` // @TODO: SURE ??
 	ExecutionDuration *metav1.Duration `json:"duration,omitempty"`
 }
 
@@ -66,4 +67,26 @@ type ImageBackupList struct {
 
 func init() {
 	SchemeBuilder.Register(&ImageBackup{}, &ImageBackupList{})
+}
+
+func DeploymentKey(in string) string {
+	return fmt.Sprintf("%s_%s", DeploymentResourceType, in)
+}
+
+func DaemonSet(in string) string {
+	return fmt.Sprintf("%s_%s", DaemonSetResourceType, in)
+}
+
+func NewImageBackup(ns, nm, img, rn, rt string) *ImageBackup {
+	return &ImageBackup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      nm,
+		},
+		Spec: ImageBackupSpec{
+			Image:        img,
+			ResourceName: rn,
+			ResourceType: rt,
+		},
+	}
 }

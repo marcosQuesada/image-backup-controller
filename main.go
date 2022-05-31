@@ -85,9 +85,10 @@ func main() {
 	bannedNamespaces := []string{kubeSystemNamespace, "ingress-nginx"} // @TODO:
 	dr := registry.NewDockerRegistry(backupRegistry)
 	if err = (&controllers.DeploymentReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Log:    ctrl.Log.WithName("controllers").WithName("deployment"),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Log:      ctrl.Log.WithName("controllers").WithName("deployment"),
+		Registry: dr,
 	}).SetupWithManager(mgr, dr, bannedNamespaces); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Deployment")
 		os.Exit(1)
@@ -103,9 +104,10 @@ func main() {
 	}
 
 	if err = (&controllers.ImageBackupReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Log:    ctrl.Log.WithName("controllers").WithName("imageBackup"),
+		Client:   mgr.GetClient(),
+		Scheme:   mgr.GetScheme(),
+		Log:      ctrl.Log.WithName("controllers").WithName("imageBackup"),
+		Registry: dr,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ImageBackup")
 		os.Exit(1)

@@ -18,17 +18,26 @@ package controllers
 
 import (
 	"context"
+	"fmt"
 	"github.com/go-logr/logr"
+	"github.com/marcosQuesada/image-backup-controller/api/v1alpha1"
+	"github.com/marcosQuesada/image-backup-controller/pkg/registry"
+	"k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
 )
+
+const defaultExistenceCheckTimeout = time.Second * 10
+const defaultBackupTimeout = time.Second * 300
 
 // DeploymentReconciler reconciles a Deployment object
 type DeploymentReconciler struct {
@@ -36,6 +45,7 @@ type DeploymentReconciler struct {
 	Scheme   *runtime.Scheme
 	Log      logr.Logger
 	Recorder record.EventRecorder
+	Registry registry.DockerRegistry
 }
 
 //+kubebuilder:rbac:groups="";apps,resources=deployments,verbs=get;list;update;watch
@@ -43,9 +53,60 @@ type DeploymentReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
+	r.Log.Info("Deployment Reconcile", "signal", req.NamespacedName, "type", "deployment")
 
-	r.Log.Info("Reconcile Deployment", "key", req.NamespacedName)
+	dpl := &appsv1.Deployment{}
+	if err := r.Get(ctx, req.NamespacedName, dpl); err != nil {
+		if errors.IsNotFound(err) {
+			// Deployment has been deleted, skip
+			return ctrl.Result{}, nil
+		}
+
+		return ctrl.Result{}, fmt.Errorf("unable to get deploy %s error %v", req.NamespacedName, err)
+	}
+
+	processing, newInitContainersUpdated, err := r.processContainers(ctx, req.Namespace, req.Name, dpl.Spec.Template.Spec.InitContainers)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("unable to process initcontainers, error %w", err)
+	}
+
+	if processing {
+		return ctrl.Result{RequeueAfter: time.Second * 2}, nil
+	}
+
+	processing, newContainersUpdated, err := r.processContainers(ctx, req.Namespace, req.Name, dpl.Spec.Template.Spec.Containers)
+	if err != nil {
+		return ctrl.Result{}, fmt.Errorf("unable to process containers, error %w", err)
+	}
+
+	if processing {
+		return ctrl.Result{RequeueAfter: time.Second * 2}, nil
+	}
+
+	r.Log.Info("Deployment", "key", req.NamespacedName.String(), "image", dpl.Spec.Template.Spec.Containers[0].Image)
+
+	//	if !needsUpdate {
+	if !newInitContainersUpdated && !newContainersUpdated {
+		return ctrl.Result{}, nil
+	}
+
+	r.Log.Info("Rolling out updated Backup image", "resource", req.NamespacedName)
+	if err := r.Update(ctx, dpl); err != nil {
+		if errors.IsNotFound(err) {
+			// Deployment has been deleted, skip
+			r.Log.Info("deployment has been deleted before update", "resource", req.NamespacedName)
+			return ctrl.Result{}, nil
+		}
+
+		if errors.IsConflict(err) {
+			// On conflict wait 1 second and retry
+			r.Log.Info("deployment update conflict, requeue", "resource", req.NamespacedName)
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+
+		r.Log.Error(err, "unexpected error", "resource", req.NamespacedName)
+		return ctrl.Result{}, err
+	}
 
 	return ctrl.Result{}, nil
 }
@@ -63,4 +124,62 @@ func (r *DeploymentReconciler) SetupWithManager(mgr ctrl.Manager, fn ImagePredic
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&appsv1.Deployment{}, builder.WithPredicates(pr)).
 		Complete(r)
+}
+
+func (r *DeploymentReconciler) processContainers(ctx context.Context, ns, name string, cs []corev1.Container) (bool, bool, error) {
+	r.Log.Info("Processing Containers", "key", ns+"/"+name)
+
+	needsUpdate := false
+	processing := false
+	for i, container := range cs {
+		if !r.Registry.IsNonBackupImage(container.Image) {
+			continue
+		}
+
+		ib := &v1alpha1.ImageBackup{} // @TODO: Let's use our own namespace ¿?
+		err := r.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, ib)
+		if err != nil && !errors.IsNotFound(err) {
+			return false, false, fmt.Errorf("unexpected error %w getting resource %s/%s", err, ns, name)
+		}
+
+		if errors.IsNotFound(err) {
+			r.Log.Info("No ImageBackup found, create it", "key", ns+"/"+name)
+			dpl := &appsv1.Deployment{}
+			if err := r.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, dpl); err != nil {
+				if errors.IsNotFound(err) {
+					// Deployment has been deleted, skip
+					return false, false, nil
+				}
+
+				return true, false, nil
+			}
+
+			// @TODO: TAG VERSION TOO!
+			ib = v1alpha1.NewImageBackup(ns, name, container.Image, ns+"/"+name, v1alpha1.DeploymentResourceType)
+			if err := r.Create(ctx, ib); err != nil {
+				return true, false, fmt.Errorf("unable to create resource")
+			}
+
+			processing = true
+			continue
+		}
+
+		if ib.Status.Phase != v1alpha1.PhaseDone {
+			processing = true
+			continue
+		}
+
+		newImage, err := r.Registry.BackupImageName(container.Image)
+		if err != nil {
+			err = fmt.Errorf("unable to build image  %s new name, error %w", container.Image, err)
+			r.Log.Error(err, "imageName", "processContainers", container.Image, "newImage", newImage)
+			return false, false, err
+		}
+
+		r.Log.Info("Updating image", "deployment", ns+"/"+name, "from", cs[i].Image, "to", newImage)
+		cs[i].Image = newImage
+		needsUpdate = true
+	}
+
+	return processing, needsUpdate, nil
 }
