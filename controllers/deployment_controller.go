@@ -18,6 +18,10 @@ package controllers
 
 import (
 	"context"
+	"github.com/go-logr/logr"
+	"k8s.io/client-go/tools/record"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -29,7 +33,9 @@ import (
 // DeploymentReconciler reconciles a Deployment object
 type DeploymentReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Log      logr.Logger
+	Recorder record.EventRecorder
 }
 
 //+kubebuilder:rbac:groups="";apps,resources=deployments,verbs=get;list;update;watch
@@ -39,14 +45,22 @@ type DeploymentReconciler struct {
 func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	r.Log.Info("Reconcile Deployment", "key", req.NamespacedName)
 
 	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
-func (r *DeploymentReconciler) SetupWithManager(mgr ctrl.Manager) error {
+func (r *DeploymentReconciler) SetupWithManager(mgr ctrl.Manager, fn ImagePredicateFilter, banNs []string) error {
+	pr := predicate.And(
+		IgnoreDeleteEvents(),
+		IgnoreGenericEvents(),
+		IgnoreRestrictedNamespaces(banNs),
+		DeploymentReady(),
+		DeploymentHasNonBackupImage(fn.IsNonBackupImage),
+	)
+
 	return ctrl.NewControllerManagedBy(mgr).
-		For(&appsv1.Deployment{}).
+		For(&appsv1.Deployment{}, builder.WithPredicates(pr)).
 		Complete(r)
 }

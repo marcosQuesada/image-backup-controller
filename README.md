@@ -4,7 +4,34 @@
 ## Description
 // TODO(user): An in-depth paragraph about your project and overview of use
 
+## Assumptions
+ Initial assumptions are:
+- pods are already running in the cluster, so that Deployments/Statefulsets are expected to be Ready
+- we are just interested in crete/update events
+- restrict events from banned namespaces (kube-proxy)
+- we are not interested in any other workload types (Jobs/CronJobs as example will use images too)
+
+From the original assumptions we can define what are the events that we want to watch, predicates will implement each one of the restrictions
+Overall idea is that we just execute Reconcile when an image backup must be generated and rollout
+
 ## Development Process
+ First development choice was to implement 2 separate controllers, watching deployments and daemonsets.
+ In both cases they are checking used images (initContainers and containers specs), and this was enough to execute backup generation against our backupRegistry.
+ Once backup is completed it just updates deployment/daemonset spec forcing rolling update.
+
+ But, this basic scenario has big improvement space IMHO, on the situation that we need to increase concurrency, it could potentially happen that we will create an image backup more than once at the same time,
+example: 
+ Slow backup process is started and we receive another event from the same resource, basic controller implementation it's not aware of current backup executions.
+
+ This opens the space to a more 'traditional' implementation thinking in how Deployemtns/ReplicaSets/Pods are tied together in a colaborative way each one with its own controller,
+and so I created a CRD type and a controller that take the responsibility on generating backup images, delegating deployment/dameonset controllers just as imageBackup object producers.
+The flow will work as:
+- deployment/daemonset watches for objects on ready state from a non restricted namespaces
+- on create/update event controller checks if exists an ImageBackup object created for that
+  - if none is found it will create it / if it's already created it does nothing then
+- ImageBackup controller process image backup executions progressing the CRD Status
+  - Think on object deletion // @TODO:
+
  Project skaffolding:
 ```
 kubebuilder init --domain k8slab.io --repo github.com/marcosQuesada/image-backup-controller

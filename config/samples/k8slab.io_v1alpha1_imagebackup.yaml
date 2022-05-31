@@ -3,4 +3,6 @@ kind: ImageBackup
 metadata:
   name: imagebackup-sample
 spec:
-  # TODO(user): Add fields here
+  image: nginx:1.14.2
+  resource-name: nginx/nginx
+  resource-type: deployment

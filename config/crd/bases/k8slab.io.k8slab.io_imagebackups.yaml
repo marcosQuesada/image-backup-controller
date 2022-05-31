@@ -45,6 +45,11 @@ spec:
           status:
             description: ImageBackupStatus defines the observed state of ImageBackup
             properties:
+              create_at:
+                format: date-time
+                type: string
+              duration:
+                type: string
               phase:
                 type: string
             type: object

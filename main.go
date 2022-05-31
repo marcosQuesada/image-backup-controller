@@ -18,6 +18,7 @@ package main
 
 import (
 	"flag"
+	"github.com/marcosQuesada/image-backup-controller/pkg/registry"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -36,9 +37,12 @@ import (
 	//+kubebuilder:scaffold:imports
 )
 
+const kubeSystemNamespace = "kube-system"
+
 var (
-	scheme   = runtime.NewScheme()
-	setupLog = ctrl.Log.WithName("setup")
+	scheme                = runtime.NewScheme()
+	setupLog              = ctrl.Log.WithName("setup")
+	backupRegistry string = "docker.io/marcosquesada" // @TODO: Bind env vars
 )
 
 func init() {
@@ -78,27 +82,35 @@ func main() {
 		os.Exit(1)
 	}
 
+	bannedNamespaces := []string{kubeSystemNamespace, "ingress-nginx"} // @TODO:
+	dr := registry.NewDockerRegistry(backupRegistry)
 	if err = (&controllers.DeploymentReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+		Log:    ctrl.Log.WithName("controllers").WithName("deployment"),
+	}).SetupWithManager(mgr, dr, bannedNamespaces); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Deployment")
 		os.Exit(1)
 	}
+
 	if err = (&controllers.DaemonSetReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
-	}).SetupWithManager(mgr); err != nil {
+		Log:    ctrl.Log.WithName("controllers").WithName("daemonSet"),
+	}).SetupWithManager(mgr, dr, bannedNamespaces); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DaemonSet")
 		os.Exit(1)
 	}
+
 	if err = (&controllers.ImageBackupReconciler{
 		Client: mgr.GetClient(),
 		Scheme: mgr.GetScheme(),
+		Log:    ctrl.Log.WithName("controllers").WithName("imageBackup"),
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "ImageBackup")
 		os.Exit(1)
 	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {

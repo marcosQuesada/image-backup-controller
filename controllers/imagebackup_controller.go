@@ -18,6 +18,8 @@ package controllers
 
 import (
 	"context"
+	"github.com/go-logr/logr"
+	"k8s.io/client-go/tools/record"
 
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -30,7 +32,9 @@ import (
 // ImageBackupReconciler reconciles a ImageBackup object
 type ImageBackupReconciler struct {
 	client.Client
-	Scheme *runtime.Scheme
+	Scheme   *runtime.Scheme
+	Log      logr.Logger
+	Recorder record.EventRecorder
 }
 
 //+kubebuilder:rbac:groups=k8slab.io.k8slab.io,resources=imagebackups,verbs=get;list;watch;create;update;patch;delete
@@ -42,7 +46,7 @@ type ImageBackupReconciler struct {
 func (r *ImageBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	_ = log.FromContext(ctx)
 
-	// TODO(user): your logic here
+	r.Log.Info("Reconcile Image Backup", "key", req.NamespacedName)
 
 	return ctrl.Result{}, nil
 }
