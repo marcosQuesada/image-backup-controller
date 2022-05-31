@@ -1,0 +1,24 @@
+# permissions for end users to edit imagebackups.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: imagebackup-editor-role
+rules:
+- apiGroups:
+  - k8slab.io.k8slab.io
+  resources:
+  - imagebackups
+  verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
+  - update
+  - watch
+- apiGroups:
+  - k8slab.io.k8slab.io
+  resources:
+  - imagebackups/status
+  verbs:
+  - get

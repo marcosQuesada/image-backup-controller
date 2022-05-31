@@ -1,0 +1,26 @@
+domain: k8slab.io
+layout:
+- go.kubebuilder.io/v3
+projectName: image-backup-controller
+repo: github.com/marcosQuesada/image-backup-controller
+resources:
+- controller: true
+  domain: k8slab.io
+  group: k8slab.io
+  kind: Deployment
+  version: v1alpha1
+- controller: true
+  domain: k8slab.io
+  group: k8slab.io
+  kind: DaemonSet
+  version: v1alpha1
+- api:
+    crdVersion: v1
+    namespaced: true
+  controller: true
+  domain: k8slab.io
+  group: k8slab.io
+  kind: ImageBackup
+  path: github.com/marcosQuesada/image-backup-controller/api/v1alpha1
+  version: v1alpha1
+version: "3"
