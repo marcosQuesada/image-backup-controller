@@ -62,7 +62,7 @@ func (r *DaemonSetReconciler) SetupWithManager(mgr ctrl.Manager, fn ImagePredica
 		IgnoreGenericEvents(),
 		IgnoreRestrictedNamespaces(banNs),
 		DaemonSetReady(),
-		DaemonSetHasNonBackupImage(fn.IsNonBackupImage),
+		DaemonSetHasNonBackupImage(fn.IsNonImageBackup),
 	)
 	return ctrl.NewControllerManagedBy(mgr).
 		Named(daemonSetControllerName).

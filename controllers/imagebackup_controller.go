@@ -37,6 +37,9 @@ import (
 	v1alpha1 "github.com/marcosQuesada/image-backup-controller/api/v1alpha1"
 )
 
+const imageBackupNamespace = "image-backup-controller-system"
+const imageBackupCleanOutDelay = time.Minute * 5
+
 // ImageBackupReconciler reconciles a ImageBackup object
 type ImageBackupReconciler struct {
 	client.Client
@@ -46,9 +49,8 @@ type ImageBackupReconciler struct {
 	Registry registry.DockerRegistry
 }
 
-//+kubebuilder:rbac:groups=k8slab.io.k8slab.io,resources=imagebackups,verbs=get;list;watch;create;update;patch;delete
+//+kubebuilder:rbac:groups=k8slab.io.k8slab.io,resources=imagebackups,verbs=get;list;watch;update;delete
 //+kubebuilder:rbac:groups=k8slab.io.k8slab.io,resources=imagebackups/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=k8slab.io.k8slab.io,resources=imagebackups/finalizers,verbs=update
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -57,49 +59,72 @@ func (r *ImageBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 
 	ib := &v1alpha1.ImageBackup{}
 	err := r.Get(ctx, types.NamespacedName{Namespace: req.Namespace, Name: req.Name}, ib)
-	if err != nil && !errors.IsNotFound(err) {
+	if errors.IsNotFound(err) {
+		r.Log.Error(err, "unable to find imageBackup", "key", req.NamespacedName)
+		return ctrl.Result{}, nil
+	}
+
+	if err != nil {
+		r.Log.Error(err, "unexpected error", "key", req.NamespacedName)
 		return ctrl.Result{}, fmt.Errorf("unexpected error %w getting resource %s/%s", err, req.Namespace, req.Name)
 	}
 
 	r.Log.Info("Reconcile Image Backup", "key", req.NamespacedName, "status", ib.Status.Phase)
 
-	if ib.Status.Phase == "" {
+	switch ib.Status.Phase {
+	case "":
 		now := metav1.Now()
 		ib.Status.Phase = v1alpha1.PhasePending
 		ib.Status.CreateAt = &now
-		err = r.Status().Update(context.TODO(), ib)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
-
-		return ctrl.Result{}, nil
-	}
-
-	switch ib.Status.Phase {
 	case v1alpha1.PhasePending:
 		now := metav1.NewTime(time.Now())
 		ib.Status.Phase = v1alpha1.PhaseRunning
 		ib.Status.CreateAt = &now
-		err = r.Status().Update(context.TODO(), ib)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
 	case v1alpha1.PhaseRunning:
 		if err := r.execute(ctx, ib); err != nil {
-			return ctrl.Result{RequeueAfter: time.Second * 5}, err
+			r.Log.Error(err, "unexpected error", "execute", ib.Name)
+			return ctrl.Result{RequeueAfter: time.Second * 5}, nil // @TODO: 401 ¿?
 		}
 		d := metav1.Duration{Duration: time.Since(ib.Status.CreateAt.Time)}
 		ib.Status.ExecutionDuration = &d
 		ib.Status.Phase = v1alpha1.PhaseDone
-
-		err = r.Status().Update(context.TODO(), ib)
-		if err != nil {
-			return ctrl.Result{}, err
-		}
 	case v1alpha1.PhaseDone:
-		r.Log.Info("Image Backup Complete", "namespace", ib.Namespace, "name", ib.Name, "image", ib.Spec.Image)
+		r.Log.Info("Image Backup Completed", "namespace", ib.Namespace, "name", ib.Name, "image", ib.Spec.Image, "exec_duration", ib.Status.ExecutionDuration.Duration.String())
+
+		// delete resource 5 min after completion
+		if time.Since(ib.Status.CreateAt.Time.Add(ib.Status.ExecutionDuration.Duration)) <= imageBackupCleanOutDelay {
+			return ctrl.Result{RequeueAfter: imageBackupCleanOutDelay}, nil
+		}
+
+		r.Log.Info("Removing expired image backup", "key", ib.Name)
+		if err := r.Delete(ctx, ib); err != nil {
+			if !errors.IsNotFound(err) {
+				r.Log.Error(err, "unable to delete resource", "key", ib.Name)
+			}
+		}
+
 		return ctrl.Result{}, nil
 	}
+
+	// update status
+	err = r.Status().Update(ctx, ib)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Deployment has been deleted, skip
+			r.Log.Info("image backup has been deleted before update", "resource", req.NamespacedName)
+			return ctrl.Result{}, nil
+		}
+
+		if errors.IsConflict(err) {
+			// On conflict wait 1 second and retry
+			r.Log.Info("image backup update conflict, requeue", "resource", req.NamespacedName)
+			return ctrl.Result{RequeueAfter: time.Second}, nil
+		}
+
+		r.Log.Error(err, "unexpected error", "resource", req.NamespacedName)
+		return ctrl.Result{}, err
+	}
+
 	return ctrl.Result{}, nil
 }
 
@@ -122,15 +147,15 @@ func (r *ImageBackupReconciler) execute(ctx context.Context, ib *v1alpha1.ImageB
 		return err
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, defaultExistenceCheckTimeout)
-	exists, err := r.Registry.Exists(ctx, newImage)
+	existsCtx, existsCancel := context.WithTimeout(ctx, defaultExistenceCheckTimeout)
+	exists, err := r.Registry.Exists(existsCtx, newImage)
 	if err != nil {
-		cancel()
+		existsCancel()
 		err = fmt.Errorf("unable to check image %s existence, error %w", ib.Spec.Image, err)
 		r.Log.Error(err, "image", "processContainers", ib.Spec.Image, "newImage", newImage)
 		return err
 	}
-	cancel()
+	existsCancel()
 
 	if !exists {
 		r.Log.Info("Backup Image", "src", ib.Spec.Image, "dst", newImage)

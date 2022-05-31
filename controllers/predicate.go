@@ -7,10 +7,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-type ImagePredicateFilter interface {
-	IsNonBackupImage(image string) bool
-}
-
+// IgnoreDeleteEvents predicate filters delete events
 func IgnoreDeleteEvents() predicate.Predicate {
 	return predicate.Funcs{
 		DeleteFunc: func(ev event.DeleteEvent) bool {

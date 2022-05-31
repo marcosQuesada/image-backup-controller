@@ -32,7 +32,7 @@ The flow will work as:
 - ImageBackup controller process image backup executions progressing the CRD Status
   - Think on object deletion // @TODO:
 
- Project skaffolding:
+ Project scaffolding:
 ```
 kubebuilder init --domain k8slab.io --repo github.com/marcosQuesada/image-backup-controller
 kubebuilder create api --group k8slab.io --version v1alpha1 --kind Deployment

@@ -42,7 +42,9 @@ const kubeSystemNamespace = "kube-system"
 var (
 	scheme                = runtime.NewScheme()
 	setupLog              = ctrl.Log.WithName("setup")
-	backupRegistry string = "docker.io/marcosquesada" // @TODO: Bind env vars
+	backupRegistry string = "docker.io/marcosquesada/" // @TODO: Bind env vars
+	username       string = "marcosquesada"
+	token          string = "ab96c1c9-3044-4d74-8755-28b0fe8dec1a" // @TODO:
 )
 
 func init() {
@@ -61,6 +63,10 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+
+	// @TODO: HERE!
+	//_ = os.Setenv("DOCKER_CONFIG", "~/.docker/")
+
 	opts := zap.Options{
 		Development: true,
 	}
@@ -83,7 +89,7 @@ func main() {
 	}
 
 	bannedNamespaces := []string{kubeSystemNamespace, "ingress-nginx"} // @TODO:
-	dr := registry.NewDockerRegistry(backupRegistry)
+	dr := registry.NewDockerRegistry(backupRegistry, username, token)
 	if err = (&controllers.DeploymentReconciler{
 		Client:   mgr.GetClient(),
 		Scheme:   mgr.GetScheme(),

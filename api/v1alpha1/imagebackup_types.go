@@ -17,8 +17,8 @@ limitations under the License.
 package v1alpha1
 
 import (
-	"fmt"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"strings"
 )
 
 const (
@@ -40,12 +40,15 @@ type ImageBackupSpec struct {
 // ImageBackupStatus defines the observed state of ImageBackup
 type ImageBackupStatus struct {
 	Phase             string           `json:"phase,omitempty"`
-	CreateAt          *metav1.Time     `json:"create_at,omitempty"` // @TODO: SURE ??
+	CreateAt          *metav1.Time     `json:"create_at,omitempty"`
 	ExecutionDuration *metav1.Duration `json:"duration,omitempty"`
 }
 
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
+// +kubebuilder:printcolumn:name="Status",type="string",JSONPath=".status.phase",description="current status"
+// +kubebuilder:printcolumn:name="CreatedAt",type="string",JSONPath=".status.create_at",description="creation timestamp"
+// +kubebuilder:printcolumn:name="Duration",type="string",JSONPath=".status.duration",description="execution duration"
 
 // ImageBackup is the Schema for the imagebackups API
 type ImageBackup struct {
@@ -69,24 +72,8 @@ func init() {
 	SchemeBuilder.Register(&ImageBackup{}, &ImageBackupList{})
 }
 
-func DeploymentKey(in string) string {
-	return fmt.Sprintf("%s_%s", DeploymentResourceType, in)
-}
-
-func DaemonSet(in string) string {
-	return fmt.Sprintf("%s_%s", DaemonSetResourceType, in)
-}
-
-func NewImageBackup(ns, nm, img, rn, rt string) *ImageBackup {
-	return &ImageBackup{
-		ObjectMeta: metav1.ObjectMeta{
-			Namespace: ns,
-			Name:      nm,
-		},
-		Spec: ImageBackupSpec{
-			Image:        img,
-			ResourceName: rn,
-			ResourceType: rt,
-		},
-	}
+func ImageBackupNameFromImage(img string) string {
+	img = strings.ReplaceAll(img, "/", "-")
+	img = strings.ReplaceAll(img, ":", "-")
+	return strings.ReplaceAll(img, ".", "-")
 }

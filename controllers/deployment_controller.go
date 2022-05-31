@@ -23,6 +23,7 @@ import (
 	"github.com/marcosQuesada/image-backup-controller/api/v1alpha1"
 	"github.com/marcosQuesada/image-backup-controller/pkg/registry"
 	"k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/tools/record"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
@@ -38,6 +39,11 @@ import (
 
 const defaultExistenceCheckTimeout = time.Second * 10
 const defaultBackupTimeout = time.Second * 300
+
+// ImagePredicateFilter filters non image backup
+type ImagePredicateFilter interface {
+	IsNonImageBackup(image string) bool
+}
 
 // DeploymentReconciler reconciles a Deployment object
 type DeploymentReconciler struct {
@@ -118,7 +124,7 @@ func (r *DeploymentReconciler) SetupWithManager(mgr ctrl.Manager, fn ImagePredic
 		IgnoreGenericEvents(),
 		IgnoreRestrictedNamespaces(banNs),
 		DeploymentReady(),
-		DeploymentHasNonBackupImage(fn.IsNonBackupImage),
+		DeploymentHasNonBackupImage(fn.IsNonImageBackup),
 	)
 
 	return ctrl.NewControllerManagedBy(mgr).
@@ -127,17 +133,16 @@ func (r *DeploymentReconciler) SetupWithManager(mgr ctrl.Manager, fn ImagePredic
 }
 
 func (r *DeploymentReconciler) processContainers(ctx context.Context, ns, name string, cs []corev1.Container) (bool, bool, error) {
-	r.Log.Info("Processing Containers", "key", ns+"/"+name)
-
 	needsUpdate := false
 	processing := false
 	for i, container := range cs {
-		if !r.Registry.IsNonBackupImage(container.Image) {
+		if !r.Registry.IsNonImageBackup(container.Image) {
 			continue
 		}
 
-		ib := &v1alpha1.ImageBackup{} // @TODO: Let's use our own namespace ¿?
-		err := r.Get(ctx, types.NamespacedName{Namespace: ns, Name: name}, ib)
+		ib := &v1alpha1.ImageBackup{}
+		ibName := v1alpha1.ImageBackupNameFromImage(container.Image)
+		err := r.Get(ctx, types.NamespacedName{Namespace: imageBackupNamespace, Name: ibName}, ib)
 		if err != nil && !errors.IsNotFound(err) {
 			return false, false, fmt.Errorf("unexpected error %w getting resource %s/%s", err, ns, name)
 		}
@@ -151,13 +156,16 @@ func (r *DeploymentReconciler) processContainers(ctx context.Context, ns, name s
 					return false, false, nil
 				}
 
-				return true, false, nil
+				return true, false, fmt.Errorf("unexpected error getting deploy %s error %w", ns+"/"+name, err)
 			}
 
-			// @TODO: TAG VERSION TOO!
-			ib = v1alpha1.NewImageBackup(ns, name, container.Image, ns+"/"+name, v1alpha1.DeploymentResourceType)
+			ib = newImageBackup(imageBackupNamespace, ibName, container.Image, ns+"/"+name, v1alpha1.DeploymentResourceType)
 			if err := r.Create(ctx, ib); err != nil {
-				return true, false, fmt.Errorf("unable to create resource")
+				if errors.IsAlreadyExists(err) {
+					r.Log.Info("ImageBackup already exists", "key", ibName)
+					return true, false, nil
+				}
+				return true, false, fmt.Errorf("unable to create resource %s error %w", ns+"/"+name, err)
 			}
 
 			processing = true
@@ -182,4 +190,18 @@ func (r *DeploymentReconciler) processContainers(ctx context.Context, ns, name s
 	}
 
 	return processing, needsUpdate, nil
+}
+
+func newImageBackup(ns, name, img, rn, rt string) *v1alpha1.ImageBackup {
+	return &v1alpha1.ImageBackup{
+		ObjectMeta: metav1.ObjectMeta{
+			Namespace: ns,
+			Name:      name,
+		},
+		Spec: v1alpha1.ImageBackupSpec{
+			Image:        img,
+			ResourceName: rn,
+			ResourceType: rt,
+		},
+	}
 }
