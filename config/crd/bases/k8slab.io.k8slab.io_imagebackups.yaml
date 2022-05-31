@@ -15,7 +15,20 @@ spec:
     singular: imagebackup
   scope: Namespaced
   versions:
-  - name: v1alpha1
+  - additionalPrinterColumns:
+    - description: current status
+      jsonPath: .status.phase
+      name: Status
+      type: string
+    - description: creation timestamp
+      jsonPath: .status.create_at
+      name: CreatedAt
+      type: string
+    - description: execution duration
+      jsonPath: .status.duration
+      name: Duration
+      type: string
+    name: v1alpha1
     schema:
       openAPIV3Schema:
         description: ImageBackup is the Schema for the imagebackups API

@@ -30,19 +30,11 @@ rules:
   resources:
   - imagebackups
   verbs:
-  - create
   - delete
   - get
   - list
-  - patch
   - update
   - watch
-- apiGroups:
-  - k8slab.io.k8slab.io
-  resources:
-  - imagebackups/finalizers
-  verbs:
-  - update
 - apiGroups:
   - k8slab.io.k8slab.io
   resources:
