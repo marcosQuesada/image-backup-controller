@@ -10,7 +10,6 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"net/http"
 	"strings"
-	"time"
 )
 
 // DockerRegistry defines docker registry provider
@@ -46,11 +45,6 @@ func (d *dockerRegistry) IsNonImageBackup(image string) bool {
 
 // Exists checks in docker register the image existence
 func (d *dockerRegistry) Exists(ctx context.Context, image string) (bool, error) {
-	startTs := time.Now()
-	defer func() {
-		fmt.Println("Exists " + image + " total time is: " + time.Since(startTs).String())
-	}()
-
 	ref, err := name.ParseReference(image)
 	if err != nil {
 		return false, fmt.Errorf("unexpected parse image reference error %w", err)
@@ -75,11 +69,6 @@ func (d *dockerRegistry) Exists(ctx context.Context, image string) (bool, error)
 
 // Backup clones source image to backupRegistry destination
 func (d *dockerRegistry) Backup(ctx context.Context, imageSource, imageDestination string) error {
-	startTs := time.Now()
-	defer func() {
-		fmt.Println("Backup total time is: " + time.Since(startTs).String())
-	}()
-
 	if err := crane.Copy(imageSource, imageDestination, crane.WithContext(ctx), crane.WithAuth(d.credentials)); err != nil {
 		return fmt.Errorf("unexpected error copying image src %s dst %s, error %w", imageSource, imageDestination, err)
 	}
@@ -94,7 +83,6 @@ func (d *dockerRegistry) BackupImageName(image string) (string, error) {
 		return "", fmt.Errorf("unexpected parse image reference error %w", err)
 	}
 
-	fmt.Println("Repo is " + ref.String())
 	replacedName := strings.ReplaceAll(ref.Context().RepositoryStr(), "/", "_")
 
 	return fmt.Sprintf("%s%s:%s", d.backupRegistry, replacedName, ref.Identifier()), nil
