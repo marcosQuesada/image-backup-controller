@@ -25,7 +25,6 @@ import (
 	"k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
-	"k8s.io/client-go/tools/record"
 	"time"
 
 	appsv1 "k8s.io/api/apps/v1"
@@ -45,7 +44,6 @@ type ImagePredicateFilter interface {
 type GenericReconciler struct {
 	client.Client
 	Log      logr.Logger
-	Recorder record.EventRecorder
 	Registry registry.DockerRegistry
 }
 
