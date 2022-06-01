@@ -10,6 +10,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/v1/remote/transport"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // DockerRegistry defines docker registry provider
@@ -45,6 +46,12 @@ func (d *dockerRegistry) IsNonImageBackup(image string) bool {
 
 // Exists checks in docker register the image existence
 func (d *dockerRegistry) Exists(ctx context.Context, image string) (bool, error) {
+	startTs := time.Now()
+	defer func() {
+		existsCalls.Inc()
+		existsDuration.Add(time.Since(startTs).Seconds())
+	}()
+
 	ref, err := name.ParseReference(image)
 	if err != nil {
 		return false, fmt.Errorf("unexpected parse image reference error %w", err)
@@ -54,6 +61,7 @@ func (d *dockerRegistry) Exists(ctx context.Context, image string) (bool, error)
 	if err != nil {
 		e, ok := err.(*transport.Error)
 		if !ok {
+			existsErroredCalls.Inc()
 			return false, fmt.Errorf("unexpected get image %q error %w", ref, err)
 		}
 
@@ -61,6 +69,7 @@ func (d *dockerRegistry) Exists(ctx context.Context, image string) (bool, error)
 			return false, nil
 		}
 
+		existsErroredCalls.Inc()
 		return false, fmt.Errorf("unexpected get image %q transport error %w", ref, err)
 	}
 
@@ -69,7 +78,14 @@ func (d *dockerRegistry) Exists(ctx context.Context, image string) (bool, error)
 
 // Backup clones source image to backupRegistry destination
 func (d *dockerRegistry) Backup(ctx context.Context, imageSource, imageDestination string) error {
+	backupCalls.Inc()
+	startTs := time.Now()
+	defer func() {
+		backupDuration.Add(time.Since(startTs).Seconds())
+	}()
+
 	if err := crane.Copy(imageSource, imageDestination, crane.WithContext(ctx), crane.WithAuth(d.credentials)); err != nil {
+		backupErroredCalls.Inc()
 		return fmt.Errorf("unexpected error copying image src %s dst %s, error %w", imageSource, imageDestination, err)
 	}
 
