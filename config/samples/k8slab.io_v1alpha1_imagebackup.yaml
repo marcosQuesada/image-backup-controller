@@ -1,4 +1,4 @@
-apiVersion: k8slab.io.k8slab.io/v1alpha1
+apiVersion: k8slab.io/v1alpha1
 kind: ImageBackup
 metadata:
   name: imagebackup-sample
