@@ -26,17 +26,18 @@ rules:
   - update
   - watch
 - apiGroups:
-  - k8slab.io.k8slab.io
+  - k8slab.io
   resources:
   - imagebackups
   verbs:
+  - create
   - delete
   - get
   - list
   - update
   - watch
 - apiGroups:
-  - k8slab.io.k8slab.io
+  - k8slab.io
   resources:
   - imagebackups/status
   verbs:

@@ -31,8 +31,9 @@ spec:
         - /manager
         args:
         - --leader-elect
-        image: controller:latest
         name: manager
+        image: marcosquesada/image-backup-controller:latest
+        imagePullPolicy: IfNotPresent
         securityContext:
           allowPrivilegeEscalation: false
         livenessProbe:
@@ -47,8 +48,19 @@ spec:
             port: 8081
           initialDelaySeconds: 5
           periodSeconds: 10
-        # TODO(user): Configure the resources accordingly based on the project requirements.
-        # More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
+        env:
+          - name: BACKUP_REPOSITORY
+            value: docker.io/marcosquesada/
+          - name: BACKUP_REPOSITORY_USERNAME
+            valueFrom:
+              secretKeyRef:
+                name: backup-registry-secret
+                key: username
+          - name: BACKUP_REPOSITORY_PASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: backup-registry-secret
+                key: passowrd
         resources:
           limits:
             cpu: 500m

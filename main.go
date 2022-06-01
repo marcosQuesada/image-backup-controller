@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"errors"
 	"flag"
 	"github.com/marcosQuesada/image-backup-controller/pkg/registry"
 	"os"
@@ -41,11 +42,11 @@ import (
 const kubeSystemNamespace = "kube-system"
 
 var (
-	scheme                = runtime.NewScheme()
-	setupLog              = ctrl.Log.WithName("setup")
-	backupRegistry string = "docker.io/marcosquesada/" // @TODO: Bind env vars
-	username       string = "marcosquesada"
-	token          string = "ab96c1c9-3044-4d74-8755-28b0fe8dec1a" // @TODO:
+	scheme         = runtime.NewScheme()
+	setupLog       = ctrl.Log.WithName("setup")
+	backupRegistry string
+	username       string
+	token          string
 )
 
 func init() {
@@ -88,7 +89,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	bannedNamespaces := []string{kubeSystemNamespace, "ingress-nginx"} // @TODO:
+	bannedNamespaces := []string{kubeSystemNamespace, "ingress-nginx", "image-backup"} // @TODO:
 	dr := registry.NewDockerRegistry(backupRegistry, username, token)
 	g := &controllers.GenericReconciler{
 		Client:   mgr.GetClient(),
@@ -141,4 +142,30 @@ func main() {
 		setupLog.Error(err, "problem running manager")
 		os.Exit(1)
 	}
+}
+
+func init() {
+	errBadConfig := errors.New("bad config")
+	reg := os.Getenv("BACKUP_REPOSITORY")
+	if reg == "" {
+		setupLog.Error(errBadConfig, "empty backup registry")
+		os.Exit(1)
+	}
+	backupRegistry = reg
+
+	u := os.Getenv("BACKUP_REPOSITORY_USERNAME")
+	if u == "" {
+		setupLog.Error(errBadConfig, "empty registry username")
+		os.Exit(1)
+	}
+
+	username = u
+
+	pass := os.Getenv("BACKUP_REPOSITORY_PASSWORD")
+	if pass == "" {
+		setupLog.Error(errBadConfig, "empty backup password")
+		os.Exit(1)
+	}
+
+	token = pass
 }

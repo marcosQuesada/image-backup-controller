@@ -5,9 +5,9 @@ metadata:
   annotations:
     controller-gen.kubebuilder.io/version: v0.8.0
   creationTimestamp: null
-  name: imagebackups.k8slab.io.k8slab.io
+  name: imagebackups.k8slab.io
 spec:
-  group: k8slab.io.k8slab.io
+  group: k8slab.io
   names:
     kind: ImageBackup
     listKind: ImageBackupList

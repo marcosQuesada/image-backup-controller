@@ -52,8 +52,8 @@ type ImageBackupReconciler struct {
 	Registry registry.DockerRegistry
 }
 
-//+kubebuilder:rbac:groups=k8slab.io.k8slab.io,resources=imagebackups,verbs=get;list;watch;update;delete
-//+kubebuilder:rbac:groups=k8slab.io.k8slab.io,resources=imagebackups/status,verbs=get;update;patch
+//+kubebuilder:rbac:groups=k8slab.io,resources=imagebackups,verbs=get;list;watch;update;delete
+//+kubebuilder:rbac:groups=k8slab.io,resources=imagebackups/status,verbs=get;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.

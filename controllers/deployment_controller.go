@@ -22,7 +22,6 @@ import (
 	"github.com/marcosQuesada/image-backup-controller/pkg/registry"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -37,11 +36,11 @@ type DeploymentReconciler struct {
 	client.Client
 	Scheme   *runtime.Scheme
 	Log      logr.Logger
-	Recorder record.EventRecorder
 	Registry registry.DockerRegistry
 }
 
 //+kubebuilder:rbac:groups="";apps,resources=deployments,verbs=get;list;update;watch
+//+kubebuilder:rbac:groups=k8slab.io,resources=imagebackups,verbs=create;get;list
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
