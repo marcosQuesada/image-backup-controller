@@ -19,27 +19,24 @@ package controllers
 import (
 	"context"
 	"github.com/go-logr/logr"
-	"github.com/marcosQuesada/image-backup-controller/pkg/registry"
 	appsv1 "k8s.io/api/apps/v1"
-	"k8s.io/client-go/tools/record"
-	"sigs.k8s.io/controller-runtime/pkg/builder"
-	"sigs.k8s.io/controller-runtime/pkg/predicate"
-
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/tools/record"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
 const daemonSetControllerName = "image-backup-daemonset-controller"
 
 // DaemonSetReconciler reconciles a DaemonSet object
 type DaemonSetReconciler struct {
+	*GenericReconciler
 	client.Client
 	Scheme   *runtime.Scheme
 	Log      logr.Logger
 	Recorder record.EventRecorder
-	Registry registry.DockerRegistry
 }
 
 // @TODO: core groups ?
@@ -48,11 +45,10 @@ type DaemonSetReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *DaemonSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
-
 	r.Log.Info("Reconcile DaemonSet", "key", req.NamespacedName)
 
-	return ctrl.Result{}, nil
+	dms := &appsv1.DaemonSet{}
+	return r.reconcile(ctx, req, dms)
 }
 
 // SetupWithManager sets up the controller with the Manager.

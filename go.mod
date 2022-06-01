@@ -14,7 +14,7 @@ require (
 )
 
 require (
-	cloud.google.com/go v0.93.3 // indirect
+	cloud.google.com/go/compute v1.6.1 // indirect
 	github.com/Azure/go-autorest v14.2.0+incompatible // indirect
 	github.com/Azure/go-autorest/autorest v0.11.18 // indirect
 	github.com/Azure/go-autorest/autorest/adal v0.9.13 // indirect
@@ -43,6 +43,7 @@ require (
 	github.com/imdario/mergo v0.3.12 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.15.4 // indirect
+	github.com/kr/pretty v0.2.1 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
 	github.com/mitchellh/go-homedir v1.1.0 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect

@@ -37,7 +37,10 @@ import (
 	v1alpha1 "github.com/marcosQuesada/image-backup-controller/api/v1alpha1"
 )
 
-const imageBackupNamespace = "image-backup-controller-system"
+const defaultExistenceCheckTimeout = time.Second * 10
+const defaultBackupTimeout = time.Second * 300
+const imageBackupNamespace = "image-backup"
+const imageBackupControllerName = "image-backup-controller"
 const imageBackupCleanOutDelay = time.Minute * 5
 
 // ImageBackupReconciler reconciles a ImageBackup object
@@ -83,14 +86,12 @@ func (r *ImageBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	case v1alpha1.PhaseRunning:
 		if err := r.execute(ctx, ib); err != nil {
 			r.Log.Error(err, "unexpected error", "execute", ib.Name)
-			return ctrl.Result{RequeueAfter: time.Second * 5}, nil // @TODO: 401 ¿?
+			return ctrl.Result{RequeueAfter: defaultRequeueDuration}, nil
 		}
 		d := metav1.Duration{Duration: time.Since(ib.Status.CreateAt.Time)}
 		ib.Status.ExecutionDuration = &d
 		ib.Status.Phase = v1alpha1.PhaseDone
 	case v1alpha1.PhaseDone:
-		r.Log.Info("Image Backup Completed", "namespace", ib.Namespace, "name", ib.Name, "image", ib.Spec.Image, "exec_duration", ib.Status.ExecutionDuration.Duration.String())
-
 		// delete resource 5 min after completion
 		if time.Since(ib.Status.CreateAt.Time.Add(ib.Status.ExecutionDuration.Duration)) <= imageBackupCleanOutDelay {
 			return ctrl.Result{RequeueAfter: imageBackupCleanOutDelay}, nil
@@ -135,6 +136,7 @@ func (r *ImageBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		IgnoreGenericEvents(),
 	)
 	return ctrl.NewControllerManagedBy(mgr).
+		Named(imageBackupControllerName). // @TODO: RETHINK
 		For(&v1alpha1.ImageBackup{}, builder.WithPredicates(pr)).
 		Complete(r)
 }

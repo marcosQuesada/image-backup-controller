@@ -20,6 +20,7 @@ import (
 	"flag"
 	"github.com/marcosQuesada/image-backup-controller/pkg/registry"
 	"os"
+	"time"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -64,9 +65,6 @@ func main() {
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
 
-	// @TODO: HERE!
-	//_ = os.Setenv("DOCKER_CONFIG", "~/.docker/")
-
 	opts := zap.Options{
 		Development: true,
 	}
@@ -75,6 +73,7 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
+	syncPeriod := time.Second * 30 // @TODO: DEV
 	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
@@ -82,6 +81,7 @@ func main() {
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "6d243b47.k8slab.io",
+		SyncPeriod:             &(syncPeriod), // @TODO: HERE
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to start manager")
@@ -90,20 +90,26 @@ func main() {
 
 	bannedNamespaces := []string{kubeSystemNamespace, "ingress-nginx"} // @TODO:
 	dr := registry.NewDockerRegistry(backupRegistry, username, token)
-	if err = (&controllers.DeploymentReconciler{
+	g := &controllers.GenericReconciler{
 		Client:   mgr.GetClient(),
-		Scheme:   mgr.GetScheme(),
-		Log:      ctrl.Log.WithName("controllers").WithName("deployment"),
+		Log:      ctrl.Log.WithName("controllers").WithName("generic"),
 		Registry: dr,
+	}
+	if err = (&controllers.DeploymentReconciler{
+		GenericReconciler: g,
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		Log:               ctrl.Log.WithName("controllers").WithName("deployment"),
 	}).SetupWithManager(mgr, dr, bannedNamespaces); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Deployment")
 		os.Exit(1)
 	}
 
 	if err = (&controllers.DaemonSetReconciler{
-		Client: mgr.GetClient(),
-		Scheme: mgr.GetScheme(),
-		Log:    ctrl.Log.WithName("controllers").WithName("daemonSet"),
+		GenericReconciler: g,
+		Client:            mgr.GetClient(),
+		Scheme:            mgr.GetScheme(),
+		Log:               ctrl.Log.WithName("controllers").WithName("daemonSet"),
 	}).SetupWithManager(mgr, dr, bannedNamespaces); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "DaemonSet")
 		os.Exit(1)

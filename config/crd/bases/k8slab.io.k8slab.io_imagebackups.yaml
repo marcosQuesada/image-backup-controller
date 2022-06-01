@@ -50,10 +50,6 @@ spec:
             properties:
               image:
                 type: string
-              resource-name:
-                type: string
-              resource-type:
-                type: string
             type: object
           status:
             description: ImageBackupStatus defines the observed state of ImageBackup

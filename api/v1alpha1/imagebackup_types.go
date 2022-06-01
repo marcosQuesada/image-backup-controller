@@ -25,16 +25,11 @@ const (
 	PhasePending = "PENDING"
 	PhaseRunning = "RUNNING"
 	PhaseDone    = "DONE"
-
-	DeploymentResourceType = "deployment"
-	DaemonSetResourceType  = "daemonset"
 )
 
 // ImageBackupSpec defines the desired state of ImageBackup
 type ImageBackupSpec struct {
-	Image        string `json:"image,omitempty"`
-	ResourceName string `json:"resource-name,omitempty"`
-	ResourceType string `json:"resource-type,omitempty"`
+	Image string `json:"image,omitempty"`
 }
 
 // ImageBackupStatus defines the observed state of ImageBackup
