@@ -28,8 +28,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-const deploymentControllerName = "image-backup-deployment-controller"
-
 // DeploymentReconciler reconciles a Deployment object
 type DeploymentReconciler struct {
 	*GenericReconciler
@@ -45,8 +43,6 @@ type DeploymentReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *DeploymentReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Log.Info("Deployment Reconcile", "signal", req.NamespacedName, "type", "deployment")
-
 	dpl := &appsv1.Deployment{}
 	return r.reconcile(ctx, req, dpl)
 }
@@ -62,7 +58,6 @@ func (r *DeploymentReconciler) SetupWithManager(mgr ctrl.Manager, fn ImagePredic
 	)
 
 	return ctrl.NewControllerManagedBy(mgr).
-		Named(deploymentControllerName).
 		For(&appsv1.Deployment{}, builder.WithPredicates(pr)).
 		Complete(r)
 }

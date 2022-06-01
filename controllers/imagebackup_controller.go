@@ -29,18 +29,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 	"time"
 
+	v1alpha1 "github.com/marcosQuesada/image-backup-controller/api/v1alpha1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/log"
-
-	v1alpha1 "github.com/marcosQuesada/image-backup-controller/api/v1alpha1"
 )
 
 const defaultExistenceCheckTimeout = time.Second * 10
 const defaultBackupTimeout = time.Second * 300
 const imageBackupNamespace = "image-backup"
-const imageBackupControllerName = "image-backup-controller"
 const imageBackupCleanOutDelay = time.Minute * 5
 
 // ImageBackupReconciler reconciles a ImageBackup object
@@ -58,8 +55,6 @@ type ImageBackupReconciler struct {
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *ImageBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	_ = log.FromContext(ctx)
-
 	ib := &v1alpha1.ImageBackup{}
 	err := r.Get(ctx, types.NamespacedName{Namespace: req.Namespace, Name: req.Name}, ib)
 	if errors.IsNotFound(err) {
@@ -72,7 +67,7 @@ func (r *ImageBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 		return ctrl.Result{}, fmt.Errorf("unexpected error %w getting resource %s/%s", err, req.Namespace, req.Name)
 	}
 
-	r.Log.Info("Reconcile Image Backup", "key", req.NamespacedName, "status", ib.Status.Phase)
+	r.Log.V(10).Info("Reconcile Image Backup", "key", req.NamespacedName, "status", ib.Status.Phase)
 
 	switch ib.Status.Phase {
 	case "":
@@ -112,17 +107,17 @@ func (r *ImageBackupReconciler) Reconcile(ctx context.Context, req ctrl.Request)
 	if err != nil {
 		if errors.IsNotFound(err) {
 			// Deployment has been deleted, skip
-			r.Log.Info("image backup has been deleted before update", "resource", req.NamespacedName)
+			r.Log.Info("Image backup has been deleted before update", "resource", req.NamespacedName)
 			return ctrl.Result{}, nil
 		}
 
 		if errors.IsConflict(err) {
 			// On conflict wait 1 second and retry
-			r.Log.Info("image backup update conflict, requeue", "resource", req.NamespacedName)
+			r.Log.Info("Image backup update conflict, requeue", "resource", req.NamespacedName)
 			return ctrl.Result{RequeueAfter: time.Second}, nil
 		}
 
-		r.Log.Error(err, "unexpected error", "resource", req.NamespacedName)
+		r.Log.Error(err, "Unexpected error", "resource", req.NamespacedName)
 		return ctrl.Result{}, err
 	}
 
@@ -136,7 +131,6 @@ func (r *ImageBackupReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		IgnoreGenericEvents(),
 	)
 	return ctrl.NewControllerManagedBy(mgr).
-		Named(imageBackupControllerName). // @TODO: RETHINK
 		For(&v1alpha1.ImageBackup{}, builder.WithPredicates(pr)).
 		Complete(r)
 }
@@ -154,22 +148,26 @@ func (r *ImageBackupReconciler) execute(ctx context.Context, ib *v1alpha1.ImageB
 	if err != nil {
 		existsCancel()
 		err = fmt.Errorf("unable to check image %s existence, error %w", ib.Spec.Image, err)
-		r.Log.Error(err, "image", "processContainers", ib.Spec.Image, "newImage", newImage)
+		r.Log.Error(err, "execute", "exists", ib.Spec.Image, "newImage", newImage)
 		return err
 	}
 	existsCancel()
 
 	if !exists {
-		r.Log.Info("Backup Image", "src", ib.Spec.Image, "dst", newImage)
+		r.Log.Info("Creating Backup Image", "src", ib.Spec.Image, "dst", newImage)
 		ctx, cancel := context.WithTimeout(ctx, defaultBackupTimeout)
 		if err := r.Registry.Backup(ctx, ib.Spec.Image, newImage); err != nil {
 			cancel()
 			err = fmt.Errorf("unable to backup image %s, error %w", ib.Spec.Image, err)
-			r.Log.Error(err, "image", "processContainers", ib.Spec.Image, "newImage", newImage)
+			r.Log.Error(err, "execute", "backup", ib.Spec.Image, "newImage", newImage)
 			return err
 		}
 		cancel()
+		r.Log.Info("Backup Image Completed", "src", ib.Spec.Image, "dst", newImage)
+		return nil
 	}
+
+	r.Log.Info("Backup Image already exists", "src", ib.Spec.Image, "dst", newImage)
 
 	return nil
 }

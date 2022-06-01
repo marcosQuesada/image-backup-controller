@@ -27,8 +27,6 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 )
 
-const daemonSetControllerName = "image-backup-daemonset-controller"
-
 // DaemonSetReconciler reconciles a DaemonSet object
 type DaemonSetReconciler struct {
 	*GenericReconciler
@@ -37,15 +35,12 @@ type DaemonSetReconciler struct {
 	Log    logr.Logger
 }
 
-// @TODO: core groups ?
 //+kubebuilder:rbac:groups="";apps,resources=daemonsets,verbs=get;update;list;watch
 //+kubebuilder:rbac:groups=k8slab.io,resources=imagebackups,verbs=create;get;list
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
 func (r *DaemonSetReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	r.Log.Info("Reconcile DaemonSet", "key", req.NamespacedName)
-
 	dms := &appsv1.DaemonSet{}
 	return r.reconcile(ctx, req, dms)
 }
@@ -60,7 +55,6 @@ func (r *DaemonSetReconciler) SetupWithManager(mgr ctrl.Manager, fn ImagePredica
 		DaemonSetHasNonBackupImage(fn.IsNonImageBackup),
 	)
 	return ctrl.NewControllerManagedBy(mgr).
-		Named(daemonSetControllerName).
 		For(&appsv1.DaemonSet{}, builder.WithPredicates(pr)).
 		Complete(r)
 }
