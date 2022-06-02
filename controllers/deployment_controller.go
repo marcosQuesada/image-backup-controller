@@ -19,7 +19,6 @@ package controllers
 import (
 	"context"
 	"github.com/go-logr/logr"
-	"github.com/marcosQuesada/image-backup-controller/pkg/registry"
 	appsv1 "k8s.io/api/apps/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -32,9 +31,8 @@ import (
 type DeploymentReconciler struct {
 	*GenericReconciler
 	client.Client
-	Scheme   *runtime.Scheme
-	Log      logr.Logger
-	Registry registry.DockerRegistry
+	Scheme *runtime.Scheme
+	Log    logr.Logger
 }
 
 //+kubebuilder:rbac:groups="";apps,resources=deployments,verbs=get;list;update;watch

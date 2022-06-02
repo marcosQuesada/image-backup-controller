@@ -148,7 +148,7 @@ func (r *GenericReconciler) processContainers(ctx context.Context, ns, name stri
 			return false, false, err
 		}
 
-		r.Log.Info("Updating image", "resource", ns+"/"+name, "from", cs[i].Image, "to", newImage) // @TODO: Fire event?
+		r.Log.Info("Updating image", "resource", ns+"/"+name, "from", cs[i].Image, "to", newImage)
 		cs[i].Image = newImage
 		needsUpdate = true
 	}

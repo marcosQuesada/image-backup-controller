@@ -26,6 +26,7 @@ func IgnoreGenericEvents() predicate.Predicate {
 	}
 }
 
+// IgnoreRestrictedNamespaces filters events from restricted namespaces
 func IgnoreRestrictedNamespaces(restricted []string) predicate.Predicate {
 	return predicate.Funcs{
 		CreateFunc: func(ev event.CreateEvent) bool {
@@ -47,6 +48,7 @@ func isRestrictedNamespace(restricted []string, namespace string) bool {
 	return false
 }
 
+// DeploymentReady filters deployment objects that are not in ready state
 func DeploymentReady() predicate.Predicate {
 	return predicate.Funcs{
 		CreateFunc: func(ev event.CreateEvent) bool {
@@ -71,6 +73,7 @@ func isDeploymentReady(o runtime.Object) bool {
 	return d.Status.Replicas == d.Status.ReadyReplicas
 }
 
+// DaemonSetReady filters daemonSets objects that are not in ready state
 func DaemonSetReady() predicate.Predicate {
 	return predicate.Funcs{
 		CreateFunc: func(ev event.CreateEvent) bool {
@@ -95,6 +98,7 @@ func isDaemonSetReady(o runtime.Object) bool {
 	return d.Status.DesiredNumberScheduled == d.Status.NumberReady
 }
 
+// DeploymentHasNonBackupImage filters deployments using non-backup registry images
 func DeploymentHasNonBackupImage(isNonBackupImage func(string) bool) predicate.Predicate {
 	return predicate.Funcs{
 		CreateFunc: func(ev event.CreateEvent) bool {
@@ -127,6 +131,7 @@ func hasDeploymentNonBackupImage(o runtime.Object, isNonBackupImage func(string)
 	return false
 }
 
+// DaemonSetHasNonBackupImage filters daemonSets using non-backup registry images
 func DaemonSetHasNonBackupImage(isNonBackupImage func(string) bool) predicate.Predicate {
 	return predicate.Funcs{
 		CreateFunc: func(ev event.CreateEvent) bool {
